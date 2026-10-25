@@ -24,3 +24,6 @@ data/*
 
 # Local copy of the Vul4C benchmark (third-party, contains exploits)
 dataset/
+
+# LoRA adapters / fine-tuned weights (large; share via Hugging Face or a release, not git)
+checkpoints/

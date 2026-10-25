@@ -32,6 +32,7 @@ Vul4C case ──► region extraction ──► prompts (identical for all mode
 | `pipeline/metrics.py` | Detection and repair metrics, side-effect metrics, McNemar tests, Cohen's kappa. |
 | `pipeline/review.py`, `scripts/review_findings.py` | Manual review of introduced findings (export a blinded sheet, import verdicts). |
 | `config/experiment.json` | Models, cases, and settings. |
+| `training/` | Leak-free fine-tuning dataset builder and LoRA/QLoRA training script (see `notes/finetuning.md`). |
 | `scripts/check_eval_environment.sh` | Pre-flight check, plus an optional one-case sandbox smoke test. |
 
 ## Methodological choices (state these in the paper)

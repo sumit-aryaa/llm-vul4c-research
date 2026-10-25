@@ -9,7 +9,8 @@ experiment runner can treat them identically:
 
 Supported providers (``provider`` field of a model spec):
 
-- ``hf_local``           Hugging Face model on the local GPU/CPU (optionally 4-bit).
+- ``hf_local``           Hugging Face model on the local GPU/CPU (optionally 4-bit, optionally
+                         with a LoRA ``adapter`` from training/train_lora.py).
 - ``openai``             OpenAI Chat Completions API.
 - ``openai_compatible``  Any OpenAI-compatible server (Ollama, vLLM, LM Studio, ...).
 - ``anthropic``          Anthropic Messages API.
@@ -130,16 +131,26 @@ class HFLocalClient(LLMClient):
             return
         if self.spec.get("load_in_4bit"):
             self._load_4bit()
-            return
-        from pipeline.model_loader import ModelConfig, ModelLoader
+        else:
+            from pipeline.model_loader import ModelConfig, ModelLoader
 
-        cfg = ModelConfig(
-            model_name_or_path=self.model,
-            device=self.spec.get("device", "auto"),
-            torch_dtype=self.spec.get("torch_dtype", "float16"),
-        )
-        self._loader = ModelLoader(cfg)
-        self._model, self._tokenizer = self._loader.load()
+            cfg = ModelConfig(
+                model_name_or_path=self.model,
+                device=self.spec.get("device", "auto"),
+                torch_dtype=self.spec.get("torch_dtype", "float16"),
+            )
+            self._loader = ModelLoader(cfg)
+            self._model, self._tokenizer = self._loader.load()
+        adapter = self.spec.get("adapter")
+        if adapter:
+            # LoRA adapter produced by training/train_lora.py, applied on top of the base model.
+            try:
+                from peft import PeftModel
+            except ImportError as err:  # pragma: no cover - environment specific
+                raise LLMClientError("Loading a LoRA adapter needs peft: pip install peft") from err
+            logger.info("Applying LoRA adapter %s", adapter)
+            self._model = PeftModel.from_pretrained(self._model, adapter)
+            self._model.eval()
 
     def _load_4bit(self) -> None:
         try:
