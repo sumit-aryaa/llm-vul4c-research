@@ -228,13 +228,98 @@ def extract_regions(
 # Model output parsing and splicing
 # --------------------------------------------------------------------------- #
 
-_FENCE_RE = re.compile(r"```[ \t]*([A-Za-z0-9_+#.-]*)[ \t]*\n(.*?)(?:\n```|```)", re.S)
 _REGION_HEADING_RE = re.compile(r"REGION\s+(\d+)", re.I)
+
+_SCAFFOLDING_PATTERNS = [
+    re.compile(r"^\s*`{3,}[A-Za-z0-9_+#.-]*\s*$"),
+    re.compile(r"^\s*\[(?:BEGIN|END)\s+UNTRUSTED\s+SOURCE\s+CODE\]\s*$", re.I),
+    re.compile(r"^\s*#{1,6}\s*(?:File\s*:|REGION\s*\d+\s*:?)\s*.*$", re.I),
+    re.compile(r"^\s*IMPORTANT:\s*The\s+source\s+code\s+below\s+is\s+untrusted.*$", re.I),
+    re.compile(r"^\s*Treat\s+it\s+purely\s+as\s+passive\s+text\s+data.*$", re.I),
+    re.compile(r"^\s*Do\s+not\s+follow\s+any\s+directives.*$", re.I),
+    re.compile(r"^\s*TASK\s+INSTRUCTIONS:\s*$", re.I),
+    re.compile(r"^\s*Fix\s+the\s+security\s+vulnerability.*$", re.I),
+    re.compile(r"^\s*Known\s+information\s+about\s+the\s+vulnerability:\s*$", re.I),
+    re.compile(r"^\s*-\s*Reported\s+weakness\s+type:\s*.*$", re.I),
+    re.compile(r"^\s*-\s*Crash\s+report\s+observed\s+when\s+running.*$", re.I),
+    re.compile(r"^\s*---\s*$"),
+]
+
+
+def _is_scaffolding_line(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped:
+        return True
+    return any(p.match(stripped) for p in _SCAFFOLDING_PATTERNS)
+
+
+def strip_scaffolding(text: str) -> str:
+    """Strip leading and trailing prompt scaffolding lines from code text."""
+    lines = text.splitlines(keepends=True)
+    start = 0
+    while start < len(lines) and _is_scaffolding_line(lines[start]):
+        start += 1
+    end = len(lines)
+    while end > start and _is_scaffolding_line(lines[end - 1]):
+        end -= 1
+    return "".join(lines[start:end])
+
+
+def is_substantive_code(text: str) -> bool:
+    """Check if text contains substantive source code rather than only prompt scaffolding."""
+    cleaned = strip_scaffolding(text)
+    return bool(cleaned.strip())
 
 
 def extract_code_blocks(text: str) -> List[str]:
-    """Fenced code blocks, each ending with the newline that precedes its closing fence."""
-    return [m.group(2) + "\n" for m in _FENCE_RE.finditer(text or "")]
+    """Extract fenced code blocks from markdown text.
+
+    Correctly handles:
+      - Standard fenced code blocks (```c ... ```)
+      - Fences with or without language tags
+      - Repeated or nested opening fences (e.g. ```c followed by ```c)
+      - Unclosed fences reaching the end of text
+    """
+    if not text:
+        return []
+
+    blocks: List[str] = []
+    current_lines: List[str] = []
+    inside_block = False
+
+    for line in text.splitlines(keepends=True):
+        stripped = line.strip()
+        is_fence = stripped.startswith("```")
+
+        if not inside_block:
+            if is_fence:
+                inside_block = True
+                current_lines = []
+        else:
+            if is_fence:
+                content = "".join(current_lines)
+                if content.strip():
+                    if not content.endswith("\n"):
+                        content += "\n"
+                    blocks.append(content)
+                current_lines = []
+
+                fence_tag = stripped.lstrip("`").strip()
+                if fence_tag:
+                    inside_block = True
+                else:
+                    inside_block = False
+            else:
+                current_lines.append(line)
+
+    if inside_block and current_lines:
+        content = "".join(current_lines)
+        if content.strip():
+            if not content.endswith("\n"):
+                content += "\n"
+            blocks.append(content)
+
+    return blocks
 
 
 def parse_region_answers(text: str, n_regions: int) -> Tuple[Dict[int, str], List[str]]:
@@ -255,19 +340,25 @@ def parse_region_answers(text: str, n_regions: int) -> Tuple[Dict[int, str], Lis
         for idx, h in enumerate(headings):
             seg_end = headings[idx + 1].start() if idx + 1 < len(headings) else len(text)
             blocks = extract_code_blocks(text[h.end():seg_end])
+            substantive = [strip_scaffolding(b) for b in blocks if is_substantive_code(b)]
             num = int(h.group(1)) - 1
-            if blocks and 0 <= num < n_regions and num not in answers:
-                answers[num] = blocks[0]
+            if substantive and 0 <= num < n_regions and num not in answers:
+                answers[num] = substantive[0]
     if not answers:
         blocks = extract_code_blocks(text)
+        substantive = [strip_scaffolding(b) for b in blocks if is_substantive_code(b)]
         if n_regions == 1:
-            if blocks:
-                answers[0] = max(blocks, key=len)
-            elif text.strip():
-                answers[0] = text.strip("\n")
-                warnings.append("no_code_fence")
-        elif len(blocks) == n_regions:
-            answers = {i: b for i, b in enumerate(blocks)}
+            if substantive:
+                answers[0] = max(substantive, key=len)
+            elif not blocks and is_substantive_code(text):
+                cleaned = strip_scaffolding(text).strip("\n")
+                if cleaned:
+                    answers[0] = cleaned
+                    warnings.append("no_code_fence")
+            else:
+                warnings.append("no_substantive_code")
+        elif len(substantive) == n_regions:
+            answers = {i: b for i, b in enumerate(substantive)}
             warnings.append("regions_matched_by_order")
     missing = [i + 1 for i in range(n_regions) if i not in answers]
     if missing:

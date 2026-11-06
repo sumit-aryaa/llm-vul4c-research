@@ -1,0 +1,96 @@
+{
+  "experiment_name": "docker_pilot_retry3",
+  "output_dir": "results",
+  "benchmark_root": "/home/rohit_kumawat/SoK/Vul4C-Benchmark",
+  "vul4c_dataset_json": "/home/rohit_kumawat/SoK/Vul4C_Src/Vul4C.json",
+  "cases": [
+    "audiofile/CVE-2017-6832",
+    "bento4/CVE-2017-14638",
+    "binutils/CVE-2017-14729",
+    "elfutils/CVE-2017-7607",
+    "gilcc/CVE-2020-21572"
+  ],
+  "max_cases": null,
+  "tasks": [
+    "detection",
+    "repair"
+  ],
+  "samples_per_case": 1,
+  "temperature": 0.0,
+  "seed": 42,
+  "pass_at_k": [
+    1
+  ],
+  "detection": {
+    "max_output_tokens": 512,
+    "use_json_prefill": true
+  },
+  "repair": {
+    "max_output_tokens": 4096,
+    "hints": {
+      "cwe": true,
+      "sanitizer_report": false
+    }
+  },
+  "context": {
+    "max_region_lines": 300,
+    "window_lines": 30,
+    "max_total_region_lines": 600
+  },
+  "static_analysis": {
+    "enabled": true,
+    "tools": [
+      "cppcheck",
+      "flawfinder"
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "evaluate_uncalibrated": false,
+    "image": "vul4c/vul4c:4.0",
+    "setup_commands": [
+      "python3 /opt/patch_pilot_metadata.py"
+    ],
+    "mounts": [
+      "/mnt/c/Users/Rohit Kumawat/Research/llm-vul4c-research/scripts/patch_pilot_metadata.py:/opt/patch_pilot_metadata.py:ro"
+    ],
+    "disable_network_after_checkout": true,
+    "cpus": "2",
+    "memory": "6g",
+    "run_tests": true,
+    "timeouts": {
+      "checkout": 1800,
+      "compile": 1800,
+      "reproduce": 300,
+      "test": 3600
+    }
+  },
+  "models": [
+    {
+      "name": "oracle",
+      "provider": "oracle",
+      "enabled": true
+    },
+    {
+      "name": "identity",
+      "provider": "identity",
+      "enabled": true
+    },
+    {
+      "name": "ollama-qwen-1.5b",
+      "provider": "openai_compatible",
+      "enabled": true,
+      "base_url": "http://localhost:11434/v1",
+      "model": "qwen2.5-coder:1.5b"
+    },
+    {
+      "name": "ollama-qwen-7b",
+      "provider": "openai_compatible",
+      "enabled": true,
+      "base_url": "http://localhost:11434/v1",
+      "model": "qwen2.5-coder:7b",
+      "require_api_key": false,
+      "timeout_seconds": 600
+    }
+  ]
+}

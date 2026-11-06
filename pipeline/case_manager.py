@@ -193,7 +193,7 @@ class CaseManager:
     def _extract_logical_name(self, old_filename: str) -> str:
         """Extract logical base source file name without vulnerability prefix and OLD suffix."""
         name = old_filename
-        name = re.sub(r"^(?:CVE-\d{4}-\d+_)?(?:(?:NVD-)?CWE-[A-Za-z0-9_-]+_)?", "", name)
+        name = re.sub(r"^(?:CVE-\d{4}-\d+_)?(?:(?:NVD-)?CWE-(?:\d+|[A-Za-z]+)_)?", "", name)
 
         m = re.search(r"^(.*?)_OLD(-\d+)?(?:\.[^.]+)+$", name)
         if m:
