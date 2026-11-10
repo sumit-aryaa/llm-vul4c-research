@@ -74,7 +74,8 @@ DEFAULTS: Dict[str, Any] = {
     "seed": 42,
     "pass_at_k": [1],
     "detection": {"max_output_tokens": 512, "use_json_prefill": True},
-    "repair": {"max_output_tokens": 4096, "hints": {"cwe": True, "sanitizer_report": False}},
+    "repair": {"max_output_tokens": 4096, "prompt_version": "v1",
+               "hints": {"cwe": True, "sanitizer_report": False}},
     "context": {"max_region_lines": 300, "window_lines": 30, "max_total_region_lines": 600},
     "static_analysis": {"enabled": True, "tools": ["cppcheck", "flawfinder"]},
     "sandbox": {"enabled": True, "evaluate_uncalibrated": False},
@@ -116,6 +117,14 @@ def read_jsonl(path: Path) -> List[Dict[str, Any]]:
 def append_jsonl(path: Path, record: Dict[str, Any]) -> None:
     with open(path, "a", encoding="utf-8") as fh:
         fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
+def latest_by(records: List[Dict[str, Any]], field_name: str = "key") -> List[Dict[str, Any]]:
+    """Keep the last record per key (JSONL files are append-only, so later lines supersede earlier ones)."""
+    last: Dict[Any, Dict[str, Any]] = {}
+    for r in records:
+        last[r.get(field_name)] = r
+    return list(last.values())
 
 
 def gen_key(model: str, task: str, case_key: str, version: str, sample: int) -> str:
@@ -380,6 +389,7 @@ def _generate_one(client: LLMClient, spec, task, case: PreparedCase, version, s,
             case.project, case.regions,
             cwe=case.cwe_id if hints.get("cwe") else None,
             sanitizer_report=case.sanitizer_issue if hints.get("sanitizer_report") else None,
+            prompt_version=rep_cfg.get("prompt_version", "v1"),
         )
         context = {"oracle_answer": oracle_repair_answer(case.regions),
                    "identity_answer": identity_repair_answer(case.regions)}
@@ -389,6 +399,7 @@ def _generate_one(client: LLMClient, spec, task, case: PreparedCase, version, s,
         cand = build_candidate(case, answers)
         base.update({
             "output": res.text,
+            "prompt_version": rep_cfg.get("prompt_version", "v1"),
             "regions": [r.label for r in case.regions],
             "generation_ok": res.finish_reason != "error" and len(answers) == len(case.regions),
             "parse_warnings": warnings,
@@ -419,8 +430,18 @@ def run_evaluation(cfg: Dict[str, Any], cases: List[PreparedCase], out: Path,
                    use_docker: bool = True, sandbox_factory=CaseSandbox) -> None:
     gen_path, cal_path, eval_path = out / "generations.jsonl", out / "calibration.jsonl", out / "evaluations.jsonl"
     repair_gens = [g for g in read_jsonl(gen_path) if g["task"] == "repair"]
-    evaluated = {e["key"] for e in read_jsonl(eval_path)}
-    calibration = {c["case_key"]: c for c in read_jsonl(cal_path)}
+    use_docker = use_docker and cfg["sandbox"].get("enabled", True)
+    # A calibration that never ran (the container did not start) is retried, not kept.
+    calibration = {c["case_key"]: c for c in latest_by(read_jsonl(cal_path), "case_key")
+                   if not any(str(r).startswith("sandbox_start_failed") for r in c.get("reasons", []))}
+    # Records written without the sandbox (--no-docker, or Docker was unavailable) are not final:
+    # when the sandbox is in use they are evaluated again and the new record supersedes the old.
+    evaluated = set()
+    for e in latest_by(read_jsonl(eval_path)):
+        pending = use_docker and (e.get("status") == "not_run" or
+                                  (e.get("status") == "case_not_calibrated" and e["case_key"] not in calibration))
+        if not pending:
+            evaluated.add(e["key"])
     by_case = group_by([g for g in repair_gens if g["key"] not in evaluated], "case_key")
     case_map = {c.case_key: c for c in cases}
     sa_cfg = cfg["static_analysis"]
@@ -432,7 +453,8 @@ def run_evaluation(cfg: Dict[str, Any], cases: List[PreparedCase], out: Path,
             logger.warning("Static analysis tools not found (skipped): %s", ", ".join(missing))
     sandbox_cfg = SandboxConfig.from_dict({k: v for k, v in cfg["sandbox"].items()
                                            if k not in ("enabled", "evaluate_uncalibrated")})
-    use_docker = use_docker and cfg["sandbox"].get("enabled", True)
+    # "${REPO_ROOT}" in a mount is this repository, so configs work on every machine.
+    sandbox_cfg.mounts = [m.replace("${REPO_ROOT}", str(REPO_ROOT)) for m in sandbox_cfg.mounts]
     sa_cache: Dict[Any, Any] = {}
 
     for case_key, gens in by_case.items():
@@ -479,6 +501,7 @@ def run_evaluation(cfg: Dict[str, Any], cases: List[PreparedCase], out: Path,
                     if g.get("finish_reason") != "error" else ({}, [])
                 cand = build_candidate(case, answers)
                 g = dict(g, changed=cand["changed"], identical_to_reference=cand["identical_to_reference"],
+                         generation_ok=g.get("finish_reason") != "error" and len(answers) == len(case.regions),
                          patch=cand["patch"], patch_sha256=hashlib.sha256(cand["patch"].encode()).hexdigest())
                 ev: Dict[str, Any] = {
                     "key": g["key"], "model": g["model"], "case_key": case_key, "cve_id": case.cve_id,
@@ -571,8 +594,8 @@ def load_review(out: Path) -> Dict[str, Any]:
 
 def run_report(cfg: Dict[str, Any], out: Path) -> Dict[str, Any]:
     gens = read_jsonl(out / "generations.jsonl")
-    evals = [assign_finding_ids(e) for e in read_jsonl(out / "evaluations.jsonl")]
-    cals = read_jsonl(out / "calibration.jsonl")
+    evals = [assign_finding_ids(e) for e in latest_by(read_jsonl(out / "evaluations.jsonl"))]
+    cals = latest_by(read_jsonl(out / "calibration.jsonl"), "case_key")
     ks = cfg.get("pass_at_k", [1])
     review = load_review(out)
     verdicts = review.get("verdicts", {})

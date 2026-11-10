@@ -1,6 +1,6 @@
 # qwen_1.5b_benchmark: model comparison
 
-Generated 2026-10-23 10:23 UTC.
+Generated 2026-11-10 14:45 UTC.
 
 ## Calibration
 0 of 0 evaluated cases calibrated (vulnerability reproduces in the sandbox and the human fix blocks it). Dynamic repair metrics use calibrated cases only.
@@ -22,7 +22,7 @@ Each case is asked twice: vulnerable version (label = vulnerable) and developer-
 | model | candidates | calibrated_candidates | generated_rate | applied_rate | compiled_rate | exploit_blocked_rate | tests_preserved_rate | new_high_static_issue_rate | secure_and_functional_rate | identical_to_reference_rate | pass@1 |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | identity | 136 | 0 | 100.0% | - | - | - | - | 0.0% | - | 0.0% | - |
-| ollama-qwen-1.5b | 136 | 0 | 91.2% | - | - | - | - | 3.7% | - | 0.0% | - |
+| ollama-qwen-1.5b | 136 | 0 | 94.8% | - | - | - | - | 2.9% | - | 0.0% | - |
 | oracle | 136 | 0 | 100.0% | - | - | - | - | 1.5% | - | 100.0% | - |
 
 ## Security side effects of repairs

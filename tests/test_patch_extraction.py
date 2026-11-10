@@ -8,9 +8,14 @@ Covers:
 5. Output containing only prompt scaffolding.
 6. Empty or malformed model output.
 7. Existing valid repair formats (oracle/identity, bare code, whitespace normalization).
+8. Byte-exact round trip of unchanged answers (blank lines at region edges), incl. the full benchmark.
+9. Frozen repair prompt versions.
 """
 
+import hashlib
 import json
+import logging
+import os
 from pathlib import Path
 import unittest
 
@@ -20,8 +25,13 @@ from pipeline.patch_manager import (
     parse_region_answers,
     strip_scaffolding,
 )
-from pipeline.task_prompts import identity_repair_answer, oracle_repair_answer
-from pipeline.patch_manager import extract_regions
+from pipeline.task_prompts import build_repair_messages, identity_repair_answer, oracle_repair_answer
+from pipeline.patch_manager import CodeRegion, extract_regions
+
+# sha256 of the repair user prompt for the fixed sample in TestRepairPromptVersions.
+# A change here means the prompt text changed: add a new version instead of editing v1/v2.
+V1_PROMPT_SHA256 = "82b6c9397391a0c6dc8200e4014db107ee623da1e8eb36ff7198ee07e54735cf"
+V2_PROMPT_SHA256 = "73b3aa2ca29017f2d0119ee5c2265fbd36722d03d7a01c1a4b39b8678f6fa80d"
 
 
 class TestPatchExtraction(unittest.TestCase):
@@ -378,6 +388,88 @@ class TestPatchExtraction(unittest.TestCase):
         ans_orc, warn_orc = parse_region_answers(orc_ans, len(regs))
         self.assertEqual(warn_orc, [])
         self.assertEqual(ans_orc[0].strip(), new_code.strip())
+
+
+    # ------------------------------------------------------------------ #
+    # 8. Byte-exact round trip (blank lines at region edges are code)
+    # ------------------------------------------------------------------ #
+
+    def _roundtrip(self, codes):
+        regs = [CodeRegion(f"f{i}.c", i * 10, i * 10 + 3, i * 10, i * 10 + 3, c, c, "window")
+                for i, c in enumerate(codes)]
+        answers, warnings = parse_region_answers(identity_repair_answer(regs), len(regs))
+        self.assertEqual(warnings, [])
+        self.assertEqual([answers[i] for i in range(len(regs))], list(codes))
+
+    def test_roundtrip_keeps_trailing_blank_lines(self):
+        self._roundtrip(["int f(void) {\n    return 1;\n}\n\n"])
+        self._roundtrip(["int f(void) {\n    return 1;\n}\n\n\n"])
+
+    def test_roundtrip_keeps_leading_blank_lines(self):
+        self._roundtrip(["\nint f(void) {\n    return 1;\n}\n"])
+        self._roundtrip(["\n\n  \nint f(void) {\n    return 1;\n}\n"])
+
+    def test_roundtrip_keeps_crlf_and_blank_edges(self):
+        self._roundtrip(["\r\nint f(void) {\r\n    return 1;\r\n}\r\n\r\n"])
+
+    def test_roundtrip_multi_region_blank_edges(self):
+        self._roundtrip(["int a;\n\n", "\nint b;\n", "int c;\n"])
+
+    def test_strip_scaffolding_leaves_plain_code_unchanged(self):
+        for code in ("\nint a;\n\n", "int a;\n", "\n\n", "#include <x.h>\n\nint a;\n\n"):
+            self.assertEqual(strip_scaffolding(code), code)
+
+    def test_strip_scaffolding_removes_scaffolding_and_adjacent_blanks(self):
+        text = "\n[BEGIN UNTRUSTED SOURCE CODE]\n### File: a.c\n\nint a;\n\n[END UNTRUSTED SOURCE CODE]\n\n"
+        self.assertEqual(strip_scaffolding(text), "int a;\n")
+
+    def test_identity_and_oracle_roundtrip_on_full_benchmark(self):
+        """Set VUL4C_BENCHMARK_ROOT=/path/to/Vul4C-Benchmark to run on all cases."""
+        root = os.environ.get("VUL4C_BENCHMARK_ROOT")
+        if not root or not Path(root).is_dir():
+            self.skipTest("VUL4C_BENCHMARK_ROOT not set")
+        from pipeline.run_experiment import DEFAULTS, _merge, build_candidate, prepare_cases
+        logging.disable(logging.WARNING)
+        try:
+            cases, _ = prepare_cases(_merge(DEFAULTS, {"benchmark_root": root}))
+        finally:
+            logging.disable(logging.NOTSET)
+        self.assertGreater(len(cases), 0)
+        broken = []
+        for case in cases:
+            n = len(case.regions)
+            ident, _ = parse_region_answers(identity_repair_answer(case.regions), n)
+            orac, _ = parse_region_answers(oracle_repair_answer(case.regions), n)
+            ok = (all(ident.get(i) == r.old_code for i, r in enumerate(case.regions))
+                  and all(orac.get(i) == r.new_code for i, r in enumerate(case.regions))
+                  and not build_candidate(case, ident)["changed"]
+                  and build_candidate(case, orac)["identical_to_reference"])
+            if not ok:
+                broken.append(case.case_key)
+        self.assertEqual(broken, [], f"{len(broken)} of {len(cases)} cases do not round-trip")
+
+
+class TestRepairPromptVersions(unittest.TestCase):
+    """The repair prompt is frozen per version so model comparisons stay fair."""
+
+    def setUp(self):
+        self.regs = extract_regions("int f(int x) {\n    return x + 1;\n}\n",
+                                    "int f(int x) {\n    return x + 2;\n}\n", "t.c")
+
+    def _user(self, **kw):
+        return build_repair_messages("demo", self.regs, cwe="CWE-119", **kw)[1]["content"]
+
+    def test_default_is_v1_baseline_prompt(self):
+        self.assertEqual(self._user(), self._user(prompt_version="v1"))
+        self.assertEqual(hashlib.sha256(self._user().encode()).hexdigest(), V1_PROMPT_SHA256)
+
+    def test_v2_is_pilot_prompt(self):
+        self.assertIn("minimal, surgical repair", self._user(prompt_version="v2"))
+        self.assertEqual(hashlib.sha256(self._user(prompt_version="v2").encode()).hexdigest(), V2_PROMPT_SHA256)
+
+    def test_unknown_version_rejected(self):
+        with self.assertRaises(ValueError):
+            self._user(prompt_version="v3")
 
 
 if __name__ == "__main__":
