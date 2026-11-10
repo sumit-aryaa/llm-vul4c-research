@@ -331,8 +331,8 @@
       "cwe": "CWE-120",
       "regions": [
         "gilcc.c (lines 204-235)",
-        "parser.c (lines 2-234)",
-        "parser.h (lines 1-25)"
+        "src_parser.c (lines 2-234)",
+        "src_parser.h (lines 1-25)"
       ]
     },
     {
@@ -464,135 +464,135 @@
       "case": "jasper/CVE-2016-10248",
       "cwe": "CWE-476",
       "regions": [
-        "tsfb.c (lines 149-155)"
+        "jpc_tsfb.c (lines 149-155)"
       ]
     },
     {
       "case": "jasper/CVE-2016-10251",
       "cwe": "CWE-190",
       "regions": [
-        "t2cod.c (lines 410-495)"
+        "jpc_t2cod.c (lines 410-495)"
       ]
     },
     {
       "case": "jasper/CVE-2016-8691",
       "cwe": "CWE-369",
       "regions": [
-        "cs.c (lines 479-523)"
+        "jpc_cs.c (lines 479-523)"
       ]
     },
     {
       "case": "jasper/CVE-2016-8692",
       "cwe": "CWE-369",
       "regions": [
-        "cs.c (lines 479-523)"
+        "jpc_cs.c (lines 479-523)"
       ]
     },
     {
       "case": "jasper/CVE-2016-8884",
       "cwe": "CWE-476",
       "regions": [
-        "dec.c (lines 99-210)"
+        "bmp_dec.c (lines 99-210)"
       ]
     },
     {
       "case": "jasper/CVE-2016-8887",
       "cwe": "CWE-476",
       "regions": [
-        "cod.c (lines 238-313)"
+        "jp2_cod.c (lines 238-313)"
       ]
     },
     {
       "case": "jasper/CVE-2016-9387",
       "cwe": "CWE-190",
       "regions": [
-        "dec.c (lines 1188-1286)"
+        "jpc_dec.c (lines 1188-1286)"
       ]
     },
     {
       "case": "jasper/CVE-2016-9388",
       "cwe": "NVD-CWE-Other",
       "regions": [
-        "dec.c (lines 246-312)",
-        "dec.c (lines 314-367)"
+        "ras_dec.c (lines 246-312)",
+        "ras_dec.c (lines 314-367)"
       ]
     },
     {
       "case": "jasper/CVE-2016-9389",
       "cwe": "NVD-CWE-Other",
       "regions": [
-        "image.c (lines 49-110)",
-        "image.c (lines 626-687)",
-        "dec.c (lines 1034-1158)"
+        "jas_image.c (lines 49-110)",
+        "jas_image.c (lines 626-687)",
+        "jpc_dec.c (lines 1034-1158)"
       ]
     },
     {
       "case": "jasper/CVE-2016-9390",
       "cwe": "CWE-20",
       "regions": [
-        "cs.c (lines 485-539)",
-        "dec.c (lines 1188-1290)"
+        "jpc_cs.c (lines 485-539)",
+        "jpc_dec.c (lines 1188-1290)"
       ]
     },
     {
       "case": "jasper/CVE-2016-9391",
       "cwe": "NVD-CWE-Other",
       "regions": [
-        "bs.c (lines 190-208)",
-        "bs.c (lines 211-230)"
+        "jpc_bs.c (lines 190-208)",
+        "jpc_bs.c (lines 211-230)"
       ]
     },
     {
       "case": "jasper/CVE-2016-9394",
       "cwe": "CWE-20",
       "regions": [
-        "cs.c (lines 485-543)"
+        "jpc_cs.c (lines 485-543)"
       ]
     },
     {
       "case": "jasper/CVE-2016-9396",
       "cwe": "NVD-CWE-Other",
       "regions": [
-        "cs.c (lines 749-794)"
+        "jpc_cs.c (lines 749-794)"
       ]
     },
     {
       "case": "jasper/CVE-2016-9398",
       "cwe": "CWE-617",
       "regions": [
-        "t2dec.c (lines 156-412)"
+        "jpc_t2dec.c (lines 156-412)"
       ]
     },
     {
       "case": "jasper/CVE-2016-9557",
       "cwe": "CWE-190",
       "regions": [
-        "image.c (lines 130-187)",
-        "image.c (lines 189-209)",
-        "image.c (lines 309-362)",
-        "image.c (lines 1223-1293)",
-        "image.c (lines 1301-1320)"
+        "jas_image.c (lines 130-187)",
+        "jas_image.c (lines 189-209)",
+        "jas_image.c (lines 309-362)",
+        "jas_image.c (lines 1223-1293)",
+        "jas_image.c (lines 1301-1320)"
       ]
     },
     {
       "case": "jasper/CVE-2016-9560",
       "cwe": "CWE-119",
       "regions": [
-        "dec.c (lines 641-924)"
+        "jpc_dec.c (lines 641-924)"
       ]
     },
     {
       "case": "jasper/CVE-2017-6850",
       "cwe": "CWE-476",
       "regions": [
-        "cod.c (lines 155-216)",
-        "cod.c (lines 239-325)",
-        "cod.c (lines 381-395)",
-        "cod.c (lines 460-479)",
-        "cod.c (lines 485-535)",
-        "cod.c (lines 775-795)",
-        "cod.c (lines 829-865)",
-        "cod.c (lines 867-876)"
+        "jp2_cod.c (lines 155-216)",
+        "jp2_cod.c (lines 239-325)",
+        "jp2_cod.c (lines 381-395)",
+        "jp2_cod.c (lines 460-479)",
+        "jp2_cod.c (lines 485-535)",
+        "jp2_cod.c (lines 775-795)",
+        "jp2_cod.c (lines 829-865)",
+        "jp2_cod.c (lines 867-876)"
       ]
     },
     {
@@ -614,21 +614,21 @@
       "case": "libarchive/CVE-2016-10349",
       "cwe": "CWE-119",
       "regions": [
-        "cab.c (lines 625-888)"
+        "archive_read_support_format_cab.c (lines 625-888)"
       ]
     },
     {
       "case": "libarchive/CVE-2016-10350",
       "cwe": "CWE-119",
       "regions": [
-        "cab.c (lines 625-888)"
+        "archive_read_support_format_cab.c (lines 625-888)"
       ]
     },
     {
       "case": "libarchive/CVE-2016-5844",
       "cwe": "CWE-190",
       "regions": [
-        "iso9660.c (lines 1077-1163)"
+        "archive_read_support_format_iso9660.c (lines 1077-1163)"
       ]
     },
     {
@@ -759,16 +759,16 @@
       "case": "libtiff/CVE-2006-2025",
       "cwe": "CWE-000",
       "regions": [
-        "dirread.c (lines 963-1004)"
+        "tif_dirread.c (lines 963-1004)"
       ]
     },
     {
       "case": "libtiff/CVE-2010-2481",
       "cwe": "CWE-119",
       "regions": [
-        "dirread.c (lines 56-117)",
-        "dirread.c (lines 133-239)",
-        "dirread.c (lines 266-327)"
+        "tif_dirread.c (lines 56-117)",
+        "tif_dirread.c (lines 133-239)",
+        "tif_dirread.c (lines 266-327)"
       ]
     },
     {
@@ -804,24 +804,24 @@
       "case": "libtiff/CVE-2016-10095",
       "cwe": "CWE-119",
       "regions": [
-        "dirinfo.c (lines 928-967)",
-        "dirread.c (lines 3538-3599)"
+        "tif_dirinfo.c (lines 928-967)",
+        "tif_dirread.c (lines 3538-3599)"
       ]
     },
     {
       "case": "libtiff/CVE-2016-10266",
       "cwe": "CWE-369",
       "regions": [
-        "read.c (lines 321-384)"
+        "tif_read.c (lines 321-384)"
       ]
     },
     {
       "case": "libtiff/CVE-2016-10267",
       "cwe": "CWE-369",
       "regions": [
-        "ojpeg.c (lines 216-277)",
-        "ojpeg.c (lines 665-726)",
-        "ojpeg.c (lines 784-800)"
+        "tif_ojpeg.c (lines 216-277)",
+        "tif_ojpeg.c (lines 665-726)",
+        "tif_ojpeg.c (lines 784-800)"
       ]
     },
     {
@@ -835,18 +835,18 @@
       "case": "libtiff/CVE-2016-10269",
       "cwe": "CWE-125",
       "regions": [
-        "luv.c (lines 130-191)",
-        "luv.c (lines 1494-1561)",
-        "luv.c (lines 1563-1579)",
-        "pixarlog.c (lines 1233-1248)"
+        "tif_luv.c (lines 130-191)",
+        "tif_luv.c (lines 1494-1561)",
+        "tif_luv.c (lines 1563-1579)",
+        "tif_pixarlog.c (lines 1233-1248)"
       ]
     },
     {
       "case": "libtiff/CVE-2016-10270",
       "cwe": "CWE-125",
       "regions": [
-        "dirread.c (lines 5495-5584)",
-        "strip.c (lines 60-81)"
+        "tif_dirread.c (lines 5495-5584)",
+        "tif_strip.c (lines 60-81)"
       ]
     },
     {
@@ -874,7 +874,7 @@
       "case": "libtiff/CVE-2016-9273",
       "cwe": "CWE-20",
       "regions": [
-        "strip.c (lines 60-72)"
+        "tif_strip.c (lines 60-72)"
       ]
     },
     {
@@ -901,29 +901,29 @@
       "case": "libtiff/CVE-2017-7595",
       "cwe": "CWE-369",
       "regions": [
-        "jpeg.c (lines 1576-1731)"
+        "tif_jpeg.c (lines 1576-1731)"
       ]
     },
     {
       "case": "libtiff/CVE-2017-7598",
       "cwe": "CWE-369",
       "regions": [
-        "dirread.c (lines 2854-2880)",
-        "dirread.c (lines 2882-2908)"
+        "tif_dirread.c (lines 2854-2880)",
+        "tif_dirread.c (lines 2882-2908)"
       ]
     },
     {
       "case": "libtiff/CVE-2017-7601",
       "cwe": "CWE-20",
       "regions": [
-        "jpeg.c (lines 1576-1738)"
+        "tif_jpeg.c (lines 1576-1738)"
       ]
     },
     {
       "case": "libtiff/CVE-2017-7602",
       "cwe": "CWE-190",
       "regions": [
-        "read.c (lines 386-455)"
+        "tif_read.c (lines 386-455)"
       ]
     },
     {
@@ -953,14 +953,14 @@
       "case": "libzip/CVE-2017-12858",
       "cwe": "CWE-415",
       "regions": [
-        "dirent.c (lines 338-590)"
+        "zip_dirent.c (lines 338-590)"
       ]
     },
     {
       "case": "libzip/CVE-2017-14107",
       "cwe": "CWE-119",
       "regions": [
-        "open.c (lines 734-862)"
+        "zip_open.c (lines 734-862)"
       ]
     },
     {
