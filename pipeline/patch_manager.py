@@ -247,21 +247,37 @@ _SCAFFOLDING_PATTERNS = [
 
 
 def _is_scaffolding_line(line: str) -> bool:
+    """True for an echoed prompt line (fence, heading, instruction). Blank lines are NOT scaffolding."""
     stripped = line.strip()
-    if not stripped:
-        return True
-    return any(p.match(stripped) for p in _SCAFFOLDING_PATTERNS)
+    return bool(stripped) and any(p.match(stripped) for p in _SCAFFOLDING_PATTERNS)
 
 
 def strip_scaffolding(text: str) -> str:
-    """Strip leading and trailing prompt scaffolding lines from code text."""
+    """Strip echoed prompt scaffolding from the start and end of code text.
+
+    Blank lines are part of the code: a region may begin or end with one, and an unchanged
+    answer must splice back byte for byte (otherwise the identity sanity model counts as a
+    patch). Blank lines are therefore removed only together with scaffolding, i.e. when they
+    sit before/between scaffolding lines at the top or between/after them at the bottom, or
+    directly next to a removed scaffolding line. Text without scaffolding is returned unchanged.
+    """
     lines = text.splitlines(keepends=True)
-    start = 0
-    while start < len(lines) and _is_scaffolding_line(lines[start]):
-        start += 1
-    end = len(lines)
-    while end > start and _is_scaffolding_line(lines[end - 1]):
-        end -= 1
+
+    def edge(seq) -> int:
+        """Number of lines to drop from the front of ``seq`` (0 when no scaffolding leads it)."""
+        cut = 0
+        for i, line in enumerate(seq):
+            if _is_scaffolding_line(line):
+                cut = i + 1
+            elif line.strip():
+                break
+        if cut:  # separator blank lines that followed the echoed scaffolding
+            while cut < len(seq) and not seq[cut].strip():
+                cut += 1
+        return cut
+
+    start = edge(lines)
+    end = len(lines) - edge(lines[start:][::-1])
     return "".join(lines[start:end])
 
 

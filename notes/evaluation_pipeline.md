@@ -48,6 +48,34 @@ Vul4C case ──► region extraction ──► prompts (identical for all mode
 
 Plausible is not the same as correct. A patch that blocks one PoC may still be incomplete. Use `identical_to_reference_rate` and a manual review of a sample of plausible patches, as the SoK paper does, before claiming correctness.
 
+### How model answers are read
+
+Small models often repeat parts of the prompt inside their answer, for example `[BEGIN UNTRUSTED SOURCE CODE]`, the `### File:` heading or a second opening code fence. The parser removes such echoed prompt lines from the start and end of a code block and then takes the code. It never removes plain blank lines: a region may begin or end with a blank line, and an unchanged answer must go back into the file byte for byte. Otherwise the `identity` sanity model would count as a patch. A test checks this round trip for `identity` and `oracle` on every benchmark case (`VUL4C_BENCHMARK_ROOT=/path/to/Vul4C-Benchmark python3 -m unittest tests.test_patch_extraction`).
+
+An answer that is cut off by the output-token limit is used as far as it goes. It normally fails to compile and counts as a failed repair.
+
+### Repair prompt versions (frozen)
+
+The repair instructions exist in two frozen versions, selected with `repair.prompt_version` in the config and recorded in every repair record of `generations.jsonl`:
+
+| Version | Text | Used for |
+|---|---|---|
+| `v1` (default) | Short prompt: "Fix the security vulnerability with a minimal change." | The Qwen2.5-Coder 1.5B and 7B baselines in `results/`, and every model that is compared with them. |
+| `v2` | Longer "surgical repair" prompt. It tells the model not to return the code unchanged. | The Docker pilot (`config/docker_pilot.json`) only. |
+
+All models in one comparison must use the same version. Results from `v1` and `v2` must not appear in the same table. To study the prompt's effect, run both versions on the same models and report it as a separate ablation. Don't edit the text of `v1` or `v2`; add a `v3` instead. A test pins the hash of both prompts.
+
+### Deviations from the Vul4C build recipe
+
+`scripts/patch_pilot_metadata.py` runs inside the container before checkout and changes the build commands of two cases. Under WSL Docker their `./configure` scripts hung when the sanitizers were active during configuration.
+
+| Case | Change |
+|---|---|
+| elfutils / CVE-2017-7607 | `./configure` runs without AddressSanitizer. `make` still builds with AddressSanitizer. |
+| binutils / CVE-2017-14729 | `./configure` runs without sanitizers, then `make configure-host`, then `make` with AddressSanitizer and UndefinedBehaviorSanitizer. The exploit command sets `ASAN_OPTIONS=detect_leaks=0`. |
+
+The change applies to the unpatched build, the human fix and every model's patch alike, so calibration and all models see the same build. The host copy of the benchmark is not modified. Both `config/experiment.json` and `config/docker_pilot.json` apply it. Report these two cases as deviations in the paper.
+
 ## How patches are applied (and why not `vul4c apply`)
 
 The `vul4c` source (`Vul4C_Src/vul4c_tools.py`) shows three things that matter:
@@ -128,6 +156,11 @@ If the `vul4c` command is missing inside the image, mount the SoK repo and insta
    ```
    Local models are loaded one at a time, and each is unloaded before the next starts. Every stage skips work that has already been done, so you can stop a run and restart it.
 4. Static analysis only (no Docker): add `--no-docker` to the evaluate stage.
+5. Adding the Docker results to a run that was evaluated with `--no-docker`: run the evaluate stage again without `--no-docker`. Records with status `not_run` are evaluated again, and the new record replaces the old one in the report. A case whose container failed to start is calibrated again. Nothing has to be deleted, and no model is queried again.
+
+Before the full run, do the five-case pilot: `python3 pipeline/run_experiment.py --config config/docker_pilot.json --stage all`. In its `report.md`, `oracle` must be about 100% secure_and_functional and `identity` about 0% on the calibrated cases.
+
+In `sandbox.mounts`, `${REPO_ROOT}` stands for this repository, so the same config works on every machine.
 
 ## Outputs (`results/experiments/<experiment_name>/`)
 

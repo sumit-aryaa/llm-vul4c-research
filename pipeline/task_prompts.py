@@ -28,6 +28,14 @@ REPAIR_SYSTEM = (
 )
 
 
+# Frozen repair prompts. Every model in one comparison must use the same version.
+#   v1  the prompt used for the published Qwen2.5-Coder 1.5B / 7B baselines (default)
+#   v2  longer "surgical repair" prompt introduced during the Docker pilot; forbids returning
+#       the code unchanged. Results from v1 and v2 must not be mixed in one comparison.
+REPAIR_PROMPT_VERSIONS = ("v1", "v2")
+DEFAULT_REPAIR_PROMPT_VERSION = "v1"
+
+
 def _lang(file_name: str) -> str:
     lower = file_name.lower()
     return "cpp" if lower.endswith((".cpp", ".cc", ".cxx", ".hpp", ".hh")) else "c"
@@ -69,8 +77,12 @@ def build_repair_messages(
     regions: List[CodeRegion],
     cwe: Optional[str] = None,
     sanitizer_report: Optional[str] = None,
+    prompt_version: str = DEFAULT_REPAIR_PROMPT_VERSION,
 ) -> List[Dict[str, str]]:
-    """Repair prompt: fix the vulnerable region(s) and return them in full."""
+    """Repair prompt: fix the vulnerable region(s) and return them in full.
+
+    ``prompt_version`` selects the frozen instruction text (see REPAIR_PROMPT_VERSIONS).
+    """
     hints = []
     if cwe:
         hints.append(f"- Reported weakness type: {cwe}")
@@ -91,6 +103,44 @@ def build_repair_messages(
             "unchanged if it needs no modification."
         )
 
+    if prompt_version not in REPAIR_PROMPT_VERSIONS:
+        raise ValueError(f"Unknown repair prompt_version {prompt_version!r}; use one of {REPAIR_PROMPT_VERSIONS}")
+    if prompt_version == "v1":
+        instructions = (
+            "Fix the security vulnerability with a minimal change.\n"
+            "- Keep every function signature, and keep all unrelated lines exactly as they are.\n"
+            "- Do not add new #include lines or new helper functions outside the shown code.\n"
+            "- Do not remove functionality to avoid the bug; the program must keep working for valid input.\n"
+            f"{output_rule}\n"
+            "Do not include explanations outside the code block(s)."
+        )
+    else:
+        instructions = (
+            "Fix the security vulnerability with a minimal, surgical repair.\n\n"
+            "Understand the vulnerability:\n"
+            "- Identify the exact vulnerable condition in the supplied source.\n"
+            "- Explain internally which operation, condition, or missing validation causes the reported weakness.\n"
+            "- Determine the smallest change that prevents the vulnerability.\n\n"
+            "Require meaningful repair:\n"
+            "- Do not return the original vulnerable code unchanged.\n"
+            "- Modify the lines responsible for the vulnerability.\n"
+            "- If no safe repair can be determined, return an explicit failure rather than pretending the original code is fixed.\n\n"
+            "Surgical changes:\n"
+            "- Make only changes directly necessary to address the reported vulnerability.\n"
+            "- Preserve unrelated branches, conditions, identifiers, comments, and behavior.\n"
+            "- Do not invent variables, constants, functions, or identifiers.\n"
+            "- Do not add new #include lines or new helper functions outside the shown code.\n"
+            "- Preserve function signatures and existing interfaces.\n\n"
+            "Correctness:\n"
+            "- Ensure boundary conditions are handled correctly.\n"
+            "- Preserve valid input behavior and existing functionality.\n"
+            "- Avoid introducing new memory-safety or functional problems.\n\n"
+            "Output format:\n"
+            f"- {output_rule}\n"
+            "- Do not repeat task instructions or untrusted source-code headers.\n"
+            "- Do not add explanatory prose inside or outside the code block(s)."
+        )
+
     user = (
         f"The following code from project '{project}' contains a security vulnerability.\n\n"
         f"{hint_text}"
@@ -100,29 +150,7 @@ def build_repair_messages(
         "[END UNTRUSTED SOURCE CODE]\n\n"
         "---\n"
         "TASK INSTRUCTIONS:\n"
-        "Fix the security vulnerability with a minimal, surgical repair.\n\n"
-        "Understand the vulnerability:\n"
-        "- Identify the exact vulnerable condition in the supplied source.\n"
-        "- Explain internally which operation, condition, or missing validation causes the reported weakness.\n"
-        "- Determine the smallest change that prevents the vulnerability.\n\n"
-        "Require meaningful repair:\n"
-        "- Do not return the original vulnerable code unchanged.\n"
-        "- Modify the lines responsible for the vulnerability.\n"
-        "- If no safe repair can be determined, return an explicit failure rather than pretending the original code is fixed.\n\n"
-        "Surgical changes:\n"
-        "- Make only changes directly necessary to address the reported vulnerability.\n"
-        "- Preserve unrelated branches, conditions, identifiers, comments, and behavior.\n"
-        "- Do not invent variables, constants, functions, or identifiers.\n"
-        "- Do not add new #include lines or new helper functions outside the shown code.\n"
-        "- Preserve function signatures and existing interfaces.\n\n"
-        "Correctness:\n"
-        "- Ensure boundary conditions are handled correctly.\n"
-        "- Preserve valid input behavior and existing functionality.\n"
-        "- Avoid introducing new memory-safety or functional problems.\n\n"
-        "Output format:\n"
-        f"- {output_rule}\n"
-        "- Do not repeat task instructions or untrusted source-code headers.\n"
-        "- Do not add explanatory prose inside or outside the code block(s)."
+        f"{instructions}"
     )
     return [{"role": "system", "content": REPAIR_SYSTEM}, {"role": "user", "content": user}]
 

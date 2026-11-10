@@ -204,6 +204,69 @@ class TestEndToEndPipeline(unittest.TestCase):
         self.assertTrue(all(e["status"] == "not_run" for e in evs))
         rx.run_report(self.cfg, self.out)
 
+    def test_docker_run_supersedes_static_only_results(self):
+        """A --no-docker run must not block a later Docker run (the old records were 'not_run')."""
+        cases, _ = rx.prepare_cases(self.cfg)
+        rx.run_generation(self.cfg, cases, self.out, client_factory=factory)
+        rx.run_evaluation(self.cfg, cases, self.out, use_docker=False)
+        # static-only again: nothing new is written
+        rx.run_evaluation(self.cfg, cases, self.out, use_docker=False)
+        self.assertEqual(len(rx.read_jsonl(self.out / "evaluations.jsonl")), 4)
+
+        fake = FakeDocker()
+        make = lambda c, cve: CaseSandbox(c, cve, executor=fake)  # noqa: E731
+        rx.run_evaluation(self.cfg, cases, self.out, sandbox_factory=make)
+        evs = {e["model"]: e for e in rx.latest_by(rx.read_jsonl(self.out / "evaluations.jsonl"))}
+        self.assertEqual(len(evs), 4)
+        self.assertTrue(evs["oracle"]["secure_and_functional"])
+        self.assertEqual(evs["identity"]["exploit_outcome"], "crash")
+        self.assertNotIn("not_run", {e["status"] for e in evs.values()})
+
+        # finished: a further Docker run does nothing, and the report uses only the latest records
+        n_calls = len(fake.calls)
+        rx.run_evaluation(self.cfg, cases, self.out, sandbox_factory=make)
+        self.assertEqual(len(fake.calls), n_calls)
+        rep = {r["model"]: r for r in rx.run_report(self.cfg, self.out)["repair"]}
+        self.assertEqual(rep["oracle"]["candidates"], 1)
+        self.assertEqual(rep["oracle"]["secure_and_functional_rate"], 1.0)
+
+    def test_failed_sandbox_start_is_retried(self):
+        cases, _ = rx.prepare_cases(self.cfg)
+        rx.run_generation(self.cfg, cases, self.out, client_factory=factory)
+
+        class Dead:
+            def __init__(self, *a, **k):
+                pass
+
+            def start(self):
+                raise RuntimeError("docker daemon not reachable")
+
+            def stop(self):
+                pass
+
+        rx.run_evaluation(self.cfg, cases, self.out, sandbox_factory=Dead)
+        self.assertEqual({e["status"] for e in rx.read_jsonl(self.out / "evaluations.jsonl")}, {"case_not_calibrated"})
+
+        fake = FakeDocker()
+        rx.run_evaluation(self.cfg, cases, self.out,
+                          sandbox_factory=lambda c, cve: CaseSandbox(c, cve, executor=fake))
+        cal = rx.latest_by(rx.read_jsonl(self.out / "calibration.jsonl"), "case_key")
+        self.assertEqual(len(cal), 1)
+        self.assertTrue(cal[0]["calibrated"], cal[0]["reasons"])
+        evs = {e["model"]: e for e in rx.latest_by(rx.read_jsonl(self.out / "evaluations.jsonl"))}
+        self.assertTrue(evs["oracle"]["secure_and_functional"])
+
+    def test_generation_ok_is_rederived_at_evaluation(self):
+        """Old runs are re-scored with the current parser, so generation_ok must follow it too."""
+        cases, _ = rx.prepare_cases(self.cfg)
+        rx.run_generation(self.cfg, cases, self.out, client_factory=factory)
+        path = self.out / "generations.jsonl"
+        gens = rx.read_jsonl(path)
+        path.write_text("".join(
+            json.dumps(dict(g, generation_ok=False) if g["task"] == "repair" else g) + "\n" for g in gens))
+        rx.run_evaluation(self.cfg, cases, self.out, use_docker=False)
+        self.assertTrue(all(e["generation_ok"] for e in rx.read_jsonl(self.out / "evaluations.jsonl")))
+
 
 @unittest.skipUnless(shutil.which("flawfinder") or shutil.which("cppcheck"), "static analysis tools not installed")
 class TestSideEffectsReviewAndSignificance(unittest.TestCase):

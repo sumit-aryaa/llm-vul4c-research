@@ -21,6 +21,7 @@
   },
   "repair": {
     "max_output_tokens": 4096,
+    "prompt_version": "v1",
     "hints": {
       "cwe": true,
       "sanitizer_report": false
@@ -42,8 +43,12 @@
     "enabled": true,
     "evaluate_uncalibrated": false,
     "image": "vul4c/vul4c:4.0",
-    "setup_commands": [],
-    "mounts": [],
+    "setup_commands": [
+      "python3 /opt/patch_pilot_metadata.py"
+    ],
+    "mounts": [
+      "${REPO_ROOT}/scripts/patch_pilot_metadata.py:/opt/patch_pilot_metadata.py:ro"
+    ],
     "disable_network_after_checkout": true,
     "cpus": "2",
     "memory": "6g",

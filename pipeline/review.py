@@ -72,7 +72,7 @@ def _context(text: str, line: int, radius: int) -> str:
 def collect_items(cfg: Dict[str, Any], out: Path, include: str = "plausible",
                   context_lines: int = 6) -> List[Dict[str, Any]]:
     """One item per introduced high-severity finding, with code context and patch."""
-    evals = [assign_finding_ids(e) for e in rx.read_jsonl(out / "evaluations.jsonl")]
+    evals = [assign_finding_ids(e) for e in rx.latest_by(rx.read_jsonl(out / "evaluations.jsonl"))]
     gens = {g["key"]: g for g in rx.read_jsonl(out / "generations.jsonl")}
     sanity = {m["name"] for m in cfg.get("models", []) if m.get("provider") in ("oracle", "identity")}
     wanted = [e for e in evals if e["model"] not in sanity and introduced_high(e)]

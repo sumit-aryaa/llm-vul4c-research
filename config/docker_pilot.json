@@ -1,5 +1,5 @@
 {
-  "experiment_name": "docker_pilot_retry5",
+  "experiment_name": "docker_pilot_retry6",
   "output_dir": "results",
   "benchmark_root": "/home/rohit_kumawat/SoK/Vul4C-Benchmark",
   "vul4c_dataset_json": "/home/rohit_kumawat/SoK/Vul4C_Src/Vul4C.json",
@@ -27,6 +27,7 @@
   },
   "repair": {
     "max_output_tokens": 4096,
+    "prompt_version": "v2",
     "hints": {
       "cwe": true,
       "sanitizer_report": false
@@ -52,7 +53,7 @@
       "python3 /opt/patch_pilot_metadata.py"
     ],
     "mounts": [
-      "/mnt/c/Users/Rohit Kumawat/Research/llm-vul4c-research/scripts/patch_pilot_metadata.py:/opt/patch_pilot_metadata.py:ro"
+      "${REPO_ROOT}/scripts/patch_pilot_metadata.py:/opt/patch_pilot_metadata.py:ro"
     ],
     "disable_network_after_checkout": true,
     "cpus": "2",
